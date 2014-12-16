@@ -1,0 +1,7 @@
+.idea
+.iml
+target
+tracksys.properties
+fedoraproxy-all.log
+fedoraproxy-all.log-index
+fedoraproxy-all.log-taxo-index
