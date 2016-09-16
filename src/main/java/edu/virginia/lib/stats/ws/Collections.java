@@ -3,7 +3,10 @@ package edu.virginia.lib.stats.ws;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -13,8 +16,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
+import javax.inject.Singleton;
 import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonArrayBuilder;
@@ -25,6 +30,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import edu.virginia.lib.TracksysClient;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -33,33 +39,69 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import edu.virginia.lib.stats.FedoraProxyLogEntry;
 import edu.virginia.lib.stats.HitMap;
+import org.apache.solr.client.solrj.SolrServer;
+import org.apache.solr.client.solrj.impl.HttpSolrServer;
+import org.apache.solr.client.solrj.impl.XMLResponseParser;
+import org.glassfish.jersey.server.spi.Container;
+import org.glassfish.jersey.server.spi.ContainerLifecycleListener;
 
 @Path("/")
-public class Collections {
+@Singleton
+public class Collections implements ContainerLifecycleListener {
 
     private static final String VERSION = "1.0";
     
     private Collection[] collections;
-    
+
+    private TracksysClient tracksys;
+
     /**
      * It's currently assumed that any data source applies to all collections.
      */
     private DataSource[] dataSources;
     
-    public Collections() throws IOException {
-        collections = new Collection[] { Collection.EVERYTHING, new McGregorGrantCollection(), new PidListCollection(Collections.class.getClassLoader().getResourceAsStream("daily-progress-pids.txt"), "Daily Progress") };
-        dataSources = new DataSource[] { new FedoraProxyLogDataSource(new File("fedoraproxy-all.log")) };
+    public Collections() throws Exception {
+        Properties config = new Properties();
+        FileInputStream configFis = new FileInputStream("config.properties");
+        try {
+            config.load(configFis);
+        } finally {
+            configFis.close();
+        }
+
+        final SolrServer solr = new HttpSolrServer(config.getProperty("solr.url"));
+        ((HttpSolrServer) solr).setParser(new XMLResponseParser());
+
+        tracksys = new TracksysClient(config.getProperty("tracksys.url"), config.getProperty("tracksys.username"), config.getProperty("tracksys.password"));
+        collections = new Collection[]{
+                Collection.EVERYTHING,
+                new McGregorGrantCollection(tracksys),
+                new PidListCollection(Collections.class.getClassLoader().getResourceAsStream("daily-progress-pids.txt"), "Daily Progress"),
+                new SolrQueryCollection("Law Library", "law", "+source_facet:\"UVA Library Digital Repository\" +library_facet:\"Law School\" -shadowed_location_facet:\"HIDDEN\"", tracksys, solr, config.getProperty("fedora.url")),
+                new SolrQueryCollection("Health Sciences Library", "health_sciences", "+source_facet:\"UVA Library Digital Repository\" +library_facet:\"Health Sciences\" -shadowed_location_facet:\"HIDDEN\"", tracksys, solr, config.getProperty("fedora.url")),
+                new SolrQueryCollection("Special Collections", "special_collections", "+source_facet:\"UVA Library Digital Repository\" +library_facet:\"Special Collections\" -shadowed_location_facet:\"HIDDEN\"", tracksys, solr, config.getProperty("fedora.url"))};
+        dataSources = new DataSource[]{
+                new FedoraProxyLogDataSource(new File("2016-10/fedoraproxy-all.log")),
+                new MicroServiceLogDataSource(new File("2016-10/iiif-http-all.log"), new File("2016-10/pdf-all.log"), new File("2016-10/rightswrapper2-all.log"))};
     }
-    
+
+    @GET
+    @Path("stats.js")
+    @Produces("text/javascript")
+    public Response getJavascript() {
+        return Response.ok().encoding("UTF-8").entity(this.getClass().getClassLoader().getResourceAsStream("stats.js")).build();
+    }
+
     @GET
     @Produces(MediaType.TEXT_HTML)
-    public String getSimpleFormHTML() {
+    public Response getSimpleFormHTML() {
         StringBuffer response = new StringBuffer();
         response.append("<html>\n" + 
                 "  <head>\n" + 
-                "    <title>DL Stats</title>\n" + 
-                "  </head>\n" + 
-                "  <body>\n" + 
+                "    <title>DL Stats</title>\n" +
+                "  </head>\n" +
+                "  <body>\n" +
+                "    <script src=\"stats.js\" type=\"text/javascript\" ></script>\n" +
                 "  <h2>Request Activity Summary</h2>\n" + 
                 "  <form method=\"GET\" action=\"summary\">\n" +
                 "    <fieldset>\n" +
@@ -70,8 +112,8 @@ public class Collections {
             response.append("       <option value=\"" + i + "\">" + c.getName() + "</option>\n");
         }
         response.append("      </select>\n" +
-                "      <label><input type=\"checkbox\" name=\"excludeKnownBots\" value=\"true\" />Exclude activity from known bots and crawlers.</label>\n" +
-                "    </fieldset>\n" + 
+                "      <label><input type=\"checkbox\" name=\"excludeKnownBots\" value=\"true\" checked />Exclude activity from known bots and crawlers.</label>\n" +
+                "    </fieldset>\n" +
                 "    <fieldset id=\"summary-months\">\n" + 
                 "      <legend>Select Months to Include:</legend>\n");
         Calendar c = Calendar.getInstance();
@@ -82,7 +124,7 @@ public class Collections {
         endMonth.add(Calendar.YEAR, 1);
         while(c.get(Calendar.YEAR) < endMonth.get(Calendar.YEAR)) {
             if (c.get(Calendar.MONTH) == Calendar.JANUARY) {
-                response.append("      <div class=\"year\">\n");
+                response.append("      <div class=\"year\" id=\"year-" + c.get(Calendar.YEAR) + "\">\n");
             }
             final String currentMonth = (new SimpleDateFormat("yyyy-MM")).format(c.getTime());
             boolean available = false;
@@ -98,11 +140,13 @@ public class Collections {
             }
             c.add(Calendar.MONTH, 1);
         }
-        response.append("    </fieldset>\n" + 
-                "    <input type=\"submit\" value=\"Generate Report\" />\n" + 
+        response.append("    </fieldset>\n" +
+                "    <p>Generation of these reports may take several minutes.  Report generation time will increase in proportion to the number of months selected or if filtering a particular collection.</p>\n" +
+                "    <input type=\"submit\" value=\"Generate Report\" />\n" +
+                "    <input type=\"reset\" value=\"Reset Form\" />\n" +
                 "  </form>\n" + 
                 "</html>");
-        return response.toString();
+        return Response.ok().encoding("UTF-8").entity(response.toString()).build();
     }
     
     @GET
@@ -121,7 +165,7 @@ public class Collections {
     @Path("accessTypes")
     public JsonArray listAccessTypes() {
         JsonArrayBuilder a = Json.createArrayBuilder();
-        for (FedoraProxyLogEntry.AccessType t : FedoraProxyLogEntry.AccessType.values()) {
+        for (DataSource.AccessType t : DataSource.AccessType.values()) {
             a.add(Json.createObjectBuilder().add("id", t.name()).add("label", t.toString()).build());
         }
         return a.build();
@@ -152,13 +196,13 @@ public class Collections {
     @GET
     @Produces("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     @Path("summary")    
-    public Response getSummaryReport(@QueryParam("collectionId") final int collectionId, @QueryParam("months") final List<String> months, @QueryParam("excludeKnownBots") boolean excludeKnownBots) {
+    public Response getSummaryReport(@QueryParam("collectionId") final int collectionId, @QueryParam("months") final List<String> months, @QueryParam("excludeKnownBots") boolean excludeKnownBots) throws SQLException {
         final Collection c = collections[collectionId];
         XSSFWorkbook wb = new XSSFWorkbook();
         wb.getProperties().getCustomProperties().addProperty("Stats App Version", VERSION);
         wb.getProperties().getCustomProperties().addProperty("Excludes Known Bots", String.valueOf(excludeKnownBots));
         addSummary(wb, c, months, excludeKnownBots);
-        addPopularityReport(wb, c, months, java.util.Collections.singleton(FedoraProxyLogEntry.AccessType.RIGHTS_WRAPPER_DOWNLOAD.name()), excludeKnownBots, 100);
+        addPopularityReport(wb, c, months, java.util.Collections.singleton(DataSource.AccessType.RIGHTS_WRAPPER_DOWNLOAD.name()), excludeKnownBots, 100);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try {
             wb.write(baos);
@@ -171,7 +215,7 @@ public class Collections {
     @GET
     @Produces("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     @Path("popularity")    
-    public Response getPopularityReport(@QueryParam("collectionId") final int collectionId, @QueryParam("months") final List<String> months, @QueryParam("actions") final List<String> actions, @QueryParam("excludeKnownBots") boolean excludeKnownBots) {
+    public Response getPopularityReport(@QueryParam("collectionId") final int collectionId, @QueryParam("months") final List<String> months, @QueryParam("actions") final List<String> actions, @QueryParam("excludeKnownBots") boolean excludeKnownBots) throws SQLException {
         final Collection c = collections[collectionId];
         XSSFWorkbook wb = new XSSFWorkbook();
         wb.getProperties().getCustomProperties().addProperty("Stats App Version", VERSION);
@@ -200,6 +244,11 @@ public class Collections {
         }
         
         List<String> actionTypes = new ArrayList<String>(totalActions.getKeys());
+        for (DataSource.AccessType type : DataSource.AccessType.values()) {
+            if (type.shouldBeSuppressed()) {
+                actionTypes.remove(type.toString());
+            }
+        }
         java.util.Collections.sort(actionTypes);
         Sheet s = wb.createSheet("Access summary for " + c.getName());
         Row header = s.createRow(0);
@@ -207,10 +256,18 @@ public class Collections {
         for (int i = 0; i < actionTypes.size(); i ++) {
             addCell(header, i + 1, actionTypes.get(i).toString());
         }
+        Row description = s.createRow(1);
+        for (int i = 0; i < actionTypes.size(); i ++) {
+            for (DataSource.AccessType type : DataSource.AccessType.values()) {
+                if (type.toString().equals(actionTypes.get(i))) {
+                    addCell(description, i + 1, type.getDescription());
+                }
+            }
+        }
         for (int i = 0; i < months.size(); i ++) {
             String month = months.get(i);
             HitMap monthHitMap = monthHitMaps.get(month);
-            Row r = s.createRow(i + 1);
+            Row r = s.createRow(i + 2);
             addCell(r, 0, month);
             for (int j = 0; j < actionTypes.size(); j ++) {
                 addCell(r, j + 1, String.valueOf(monthHitMap.getHits(actionTypes.get(j).toString())));
@@ -222,11 +279,11 @@ public class Collections {
      * Adds a Sheet to the given Workbook that lists the top items for the
      * given accesses over all the months included.
      */
-    private void addPopularityReport(Workbook wb, Collection c, List<String> months, final java.util.Collection<String> actions, boolean excludeKnownBots, int itemCount) {
+    private void addPopularityReport(Workbook wb, Collection c, List<String> months, final java.util.Collection<String> actions, boolean excludeKnownBots, int itemCount) throws SQLException {
         final HitMap items = new HitMap();
-        Set<FedoraProxyLogEntry.AccessType> actionTypes = new HashSet<FedoraProxyLogEntry.AccessType>();
+        Set<DataSource.AccessType> actionTypes = new HashSet<DataSource.AccessType>();
         for (String action : actions) {
-            actionTypes.add(FedoraProxyLogEntry.AccessType.valueOf(action));
+            actionTypes.add(DataSource.AccessType.valueOf(action));
         }
         for (String month : months) {
             for (DataSource d : dataSources) {
@@ -239,6 +296,8 @@ public class Collections {
         Row header = s.createRow(0);
         addCell(header, 0, "Image PID");
         addCell(header, 1, summarizeAccessTypes(actionTypes));
+        addCell(header, 2, "description");
+        addCell(header, 3, "URL");
 
         ArrayList<String> sorted = new ArrayList<String>();
         for (String pid : items.getKeys()) {
@@ -254,12 +313,15 @@ public class Collections {
             Row r = s.createRow(i + 1);
             addCell(r, 0, sorted.get(i));
             addCell(r, 1, String.valueOf(items.getHits(sorted.get(i))));
+            TracksysClient.Summary summary = tracksys.getDescriptionOfPid(sorted.get(i));
+            addCell(r, 2, summary != null ? summary.getTitle() : "");
+            addCell(r, 3, summary != null ? summary.getUrl() : "");
         }
     }
     
-    private String summarizeAccessTypes(java.util.Collection<FedoraProxyLogEntry.AccessType> actions) {
+    private String summarizeAccessTypes(java.util.Collection<DataSource.AccessType> actions) {
         StringBuffer sb = new StringBuffer();
-        for (FedoraProxyLogEntry.AccessType action : actions) {
+        for (DataSource.AccessType action : actions) {
             if (sb.length() > 0) {
                 sb.append(", ");
             }
@@ -272,5 +334,23 @@ public class Collections {
         Cell c = r.createCell(index);
         c.setCellValue(value);
     }
-    
+
+    @Override
+    public void onStartup(Container container) {
+
+    }
+
+    @Override
+    public void onReload(Container container) {
+
+    }
+
+    @Override
+    public void onShutdown(Container container) {
+        try {
+            tracksys.closeConnection();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

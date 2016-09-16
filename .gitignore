@@ -2,6 +2,7 @@
 .iml
 target
 tracksys.properties
-fedoraproxy-all.log
-fedoraproxy-all.log-index
-fedoraproxy-all.log-taxo-index
+*-index
+*-taxo-index
+2016-10
+config.properties

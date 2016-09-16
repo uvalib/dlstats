@@ -4,12 +4,12 @@
     <append>true</append>
     <encoder>
       <pattern>
-        %d{ISO8601} - %-5level - %msg%n
+        %d %-5level - %msg%n
      </pattern>
     </encoder>
   </appender>
 
-  <logger name="edu.virginia" level="TRACE" additivity="false">
+  <logger name="edu.virginia" level="DEBUG" additivity="false">
     <appender-ref ref="FILE" />
   </logger>
 

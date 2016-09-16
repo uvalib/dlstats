@@ -3,62 +3,12 @@ package edu.virginia.lib.stats;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import edu.virginia.lib.stats.ws.DataSource.AccessType;
+
 /**
  * Created by md5wz on 9/9/15.
  */
 public class FedoraProxyLogEntry extends LogEntry {
-
-    public enum AccessType {
-        SCRIPT_TEXT,
-        SCRIPT_PDF,
-        THUMBNAIL,
-        POLICY,
-        IMAGE_DOWNLOAD,
-        RIGHTS_WRAPPER_DOWNLOAD,
-        REGION,
-        DIRECT_FEDORA_ACCESS,
-        UNSUCCESSFUL,
-        DPLA_HARVEST,
-        UNKNOWN;
-        
-        public static AccessType fromString(String string) {
-            for (AccessType t : values()) {
-                if (string.equals(t.toString())) {
-                    return t;
-                }
-            }
-            return null;
-        }
-        
-        public String toString() {
-            switch (this) {
-            case SCRIPT_TEXT:
-                return "Anchor Script Text";
-            case SCRIPT_PDF:
-                return "Anchor Script PDF";
-            case THUMBNAIL:
-                return "Thumbnail";
-            case POLICY:
-                return "Policy request";
-            case IMAGE_DOWNLOAD:
-                return "Static image download";
-            case RIGHTS_WRAPPER_DOWNLOAD:
-                return "Rights-wrapper download";
-            case REGION:
-                return "Region download (interactive view)";
-            case DIRECT_FEDORA_ACCESS:
-                return "Unclassified Fedora access (likely internal staff)";
-            case DPLA_HARVEST:
-                return "DPLA Harvest";
-            case UNSUCCESSFUL:
-                return "Unsuccessful request";
-            case UNKNOWN:
-                return "Unknown access";
-            default:
-                return "Unknown";
-            }
-        }
-    }
 
     public FedoraProxyLogEntry(String line) {
         super(line);

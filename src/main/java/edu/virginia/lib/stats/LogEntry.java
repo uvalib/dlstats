@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
  */
 public class LogEntry {
 
-    private static final Pattern LOG_PATTERN = Pattern.compile("(\\d+\\.\\d+\\.\\d+\\.\\d+)\\Q - - \\E\\[([^\\]]+)\\] \"([^ ]+) ([^ ]+) .+\" (\\d+) (\\d+|-)( \"(.+)\" \"(.+)\")?");
+    private static final Pattern LOG_PATTERN = Pattern.compile("(\\d+\\.\\d+\\.\\d+\\.\\d+)\\Q - - \\E\\[([^\\]]+)\\] \"([^ ]+) ([^ ]+)[^\"]*\" (\\d+) (\\d+|-)( \"(.+)\" \"(.+)\")?");
     private static final Pattern ALT_LOG_PATTERN = Pattern.compile("(::1)\\Q - - \\E\\[([^\\]]+)\\] \"([^ ]+) ([^ ]+) .+\" (\\d+) (\\d+|-)( \"(.+)\" \"(.+)\")?");
 
 

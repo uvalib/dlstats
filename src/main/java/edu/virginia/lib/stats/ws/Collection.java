@@ -1,10 +1,12 @@
 package edu.virginia.lib.stats.ws;
 
+import java.io.IOException;
+
 public interface Collection {
 
     public String getName();
     
-    public boolean isIdInCollection(String id);
+    public boolean isIdInCollection(String id) throws IOException;
     
     public static Collection EVERYTHING = new Collection() {
 
