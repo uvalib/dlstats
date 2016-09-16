@@ -47,7 +47,7 @@ public class McGregorGrantCollection implements Collection {
                     rs.close();
                 }
                 
-                sql = "select distinct pid from agencies join orders on agencies.id=orders.agency_id join units on units.order_id=orders.id join bibls on units.bibl_id=bibls.id where agencies.id=?";
+                sql = "select distinct pid from agencies join orders on agencies.id=orders.agency_id join units on units.order_id=orders.id join metadata on units.metadata_id=metadata.id where agencies.id=?";
                 s = c.getDBConnection().prepareStatement(sql);
                 s.setLong(1, agencyId);
                 rs = s.executeQuery();
