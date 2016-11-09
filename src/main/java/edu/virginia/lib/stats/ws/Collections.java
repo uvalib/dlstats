@@ -27,8 +27,10 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 
 import edu.virginia.lib.TracksysClient;
 import org.apache.poi.ss.usermodel.Cell;
@@ -94,14 +96,14 @@ public class Collections implements ContainerLifecycleListener {
 
     @GET
     @Produces(MediaType.TEXT_HTML)
-    public Response getSimpleFormHTML() {
+    public Response getSimpleFormHTML(@Context UriInfo uriInfo) {
         StringBuffer response = new StringBuffer();
         response.append("<html>\n" + 
                 "  <head>\n" + 
                 "    <title>DL Stats</title>\n" +
                 "  </head>\n" +
                 "  <body>\n" +
-                "    <script src=\"stats.js\" type=\"text/javascript\" ></script>\n" +
+                "    <script src=\"" + uriInfo.getRequestUri().toString() + (uriInfo.getRequestUri().toString().endsWith("/") ? "" : "/") + "stats.js\" type=\"text/javascript\" ></script>\n" +
                 "  <h2>Request Activity Summary</h2>\n" + 
                 "  <form method=\"GET\" action=\"summary\">\n" +
                 "    <fieldset>\n" +
