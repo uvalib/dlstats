@@ -105,7 +105,7 @@ public class Collections implements ContainerLifecycleListener {
                 "  <body>\n" +
                 "    <script src=\"" + uriInfo.getRequestUri().toString() + (uriInfo.getRequestUri().toString().endsWith("/") ? "" : "/") + "stats.js\" type=\"text/javascript\" ></script>\n" +
                 "  <h2>Request Activity Summary</h2>\n" + 
-                "  <form method=\"GET\" action=\"summary\">\n" +
+                "  <form method=\"GET\" action=\"" + uriInfo.getBaseUriBuilder().path("summary").build().toString() + "\">\n" +
                 "    <fieldset>\n" +
                 "      <legend>Select Collection:</legend>\n" + 
                 "      <select id=\"summary-collections\" name=\"collectionId\">\n"); 
