@@ -5,7 +5,7 @@
 
   <groupId>edu.virginia.lib</groupId>
   <artifactId>stats</artifactId>
-  <version>2.1</version>
+  <version>2.2</version>
   <packaging>war</packaging>
 
   <name>stats</name>
@@ -112,7 +112,7 @@
     <dependency>
       <groupId>edu.virginia.lib</groupId>
       <artifactId>tracksys-database-client</artifactId>
-      <version>1.1</version>
+      <version>1.2</version>
     </dependency>
 
     <!-- https://github.com/uvalib/fedora-3-helper -->
