@@ -149,7 +149,7 @@ public class MicroServiceLogDataSource extends LuceneCachingDataSource {
     }
 
     public String getEndingAvailability() {
-        return "2016-09";
+        return "2016-11";
     }
 
     public String toString() {
