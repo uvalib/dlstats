@@ -70,6 +70,7 @@ public class SolrQueryCollectionTest {
         when(mockTracksys.getPagePids(PID, false)).thenReturn(pages);
 
         SolrQueryCollection c = new SolrQueryCollection("First Test", "firstTest", "id:\"" + PID + "\"", mockTracksys, solr, "http://fake");
+        c.reloadCollection();
         try {
             assertTrue(PID + " should be in the index now!", c.isItemIndexed(new IndexSearcher(c.cache.getDirectoryReader()), PID));
             assertTrue(PID + " should be part of collection \"test\".", c.isIdInCollection(PID));

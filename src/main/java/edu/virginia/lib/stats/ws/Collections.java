@@ -24,7 +24,9 @@ import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonArrayBuilder;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
@@ -161,7 +163,13 @@ public class Collections implements ContainerLifecycleListener {
         }
         return a.build();
     }
-    
+
+    @POST
+    @Path("collections/{id}/refresh")
+    public void refreshCollection(@PathParam("id") final int id) {
+        this.collections[id].reloadCollection();
+    }
+
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Path("accessTypes")

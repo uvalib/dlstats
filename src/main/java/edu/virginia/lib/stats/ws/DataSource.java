@@ -12,7 +12,7 @@ public interface DataSource {
         SCRIPT_PDF("WSLS Anchor Script PDF", "The number of times a WSLS anchor script PDF was downloaded.", false),
         THUMBNAIL("Thumbnail", "The number of times a thumbnail was presented to a user.  These thumbnails are shown in search results and on the details page in Virgo.", false),
         POLICY("Policy request", "", true),
-        IMAGE_DOWNLOAD("Image Download", "The number of times a lower resolution version of the image was downloaded.", false),
+        IMAGE_DOWNLOAD("Image Download", "The number of times a lower resolution version of the image was downloaded.", true),
         RIGHTS_WRAPPER_DOWNLOAD("Full-sized Image download", "The number of times a full-sized image was downloaded.  This image includes information including a citation and text about the terms of use.", false),
         REGION("Image region request", "", false),
         PAGE_PREVIEW("Page preview", "", true),

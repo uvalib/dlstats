@@ -33,4 +33,8 @@ public class PidListCollection implements Collection {
         return pids.contains(id);
     }
 
+    @Override
+    public void reloadCollection() {
+    }
+
 }

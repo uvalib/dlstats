@@ -8,6 +8,13 @@ import org.apache.lucene.facet.taxonomy.directory.DirectoryTaxonomyWriter;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.Collector;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.MatchAllDocsQuery;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.TotalHitCountCollector;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.NIOFSDirectory;
 import org.slf4j.Logger;
@@ -68,6 +75,22 @@ public class LuceneCache {
 
     public boolean isEmpty() {
         return empty;
+    }
+
+    public int docCount() throws IOException {
+        return docCount(new MatchAllDocsQuery());
+    }
+
+    public int docCount(Query query) throws IOException {
+        final DirectoryReader indexReader = getDirectoryReader();
+        try {
+            final IndexSearcher searcher = new IndexSearcher(indexReader);
+            TotalHitCountCollector hits = new TotalHitCountCollector();
+            searcher.search(query, hits);
+            return hits.getTotalHits();
+        } finally {
+            indexReader.close();
+        }
     }
 
 }

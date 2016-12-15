@@ -7,6 +7,8 @@ import org.apache.lucene.document.StringField;
 import org.apache.lucene.facet.FacetField;
 import org.apache.lucene.facet.taxonomy.TaxonomyWriter;
 import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.TermQuery;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,27 +49,30 @@ public class MicroServiceLogDataSource extends LuceneCachingDataSource {
                     try {
                         IIIFLogEntry e = new IIIFLogEntry(line);
                         if (e.getType().equals(AccessType.UNKNOWN) && e.getPid() != null && !e.getPid().trim().equals("")) {
-                            System.err.println("UKNOWN: " + line);
+                            logger.trace("UKNOWN: " + line);
                         }
                         if (e.getPid() == null || e.getPid().trim().equals("")) {
                             continue;
                         }
-                        Document doc = new Document();
-                        doc.add(new FacetField("action_facet", e.getType().toString()));
-                        doc.add(new StringField("action", e.getType().toString(), Store.YES));
-                        final String month = YEAR_MONTH.format(e.getDate());
-                        doc.add(new StringField("month", month, Store.YES));
-                        doc.add(new StringField("day", new SimpleDateFormat("dd").format(e.getDate()), Store.YES));
-                        doc.add(new StringField("ip", e.getClientIPAddress(), Store.YES));
-                        doc.add(new StringField("pid", e.getPid(), Store.YES));
-                        indexWriter.addDocument(cache.getFacetsConfig().build(taxoWriter, doc));
-                        records++;
+                        if (!e.getType().shouldBeSuppressed()) {
+                            Document doc = new Document();
+                            doc.add(new FacetField("action_facet", e.getType().toString()));
+                            doc.add(new StringField("action", e.getType().toString(), Store.YES));
+                            final String month = YEAR_MONTH.format(e.getDate());
+                            doc.add(new StringField("month", month, Store.YES));
+                            doc.add(new StringField("day", new SimpleDateFormat("dd").format(e.getDate()), Store.YES));
+                            doc.add(new StringField("ip", e.getClientIPAddress(), Store.YES));
+                            doc.add(new StringField("pid", e.getPid(), Store.YES));
+                            indexWriter.addDocument(cache.getFacetsConfig().build(taxoWriter, doc));
+                            records++;
+                        }
                     } catch (RuntimeException ex) {
-                        logger.debug("Skipping: " + line);
+                        logger.trace("Skipping: " + line);
                     }
                 }
-
-                System.out.println("Index built from " + iiifLog.getName() + " with " + records + " records parsed from " + lines + " lines.");
+                taxoWriter.commit();
+                indexWriter.commit();
+                logger.info("Index built from " + iiifLog.getName() + " with " + records + " records parsed from " + lines + " lines. (" + cache.docCount() + " docs total)");
             } finally {
                 reader.close();
                 logger.info("Parsing " + iiifLog.getName() + " [completed]");
@@ -83,22 +88,32 @@ public class MicroServiceLogDataSource extends LuceneCachingDataSource {
                 int lines = 0;
                 while ((line = reader.readLine()) != null) {
                     lines++;
-                    Matcher m = pdfDownloadPattern.matcher(line);
-                    if (m.matches()) {
-                        Date date = PDF_LOG_DATE_FORMAT.parse(m.group(1));
-                        Document doc = new Document();
-                        doc.add(new FacetField("action_facet", DataSource.AccessType.PDF_DOWNLOAD.toString()));
-                        doc.add(new StringField("action", DataSource.AccessType.PDF_DOWNLOAD.toString(), Store.YES));
-                        final String month = YEAR_MONTH.format(date);
-                        doc.add(new StringField("month", month, Store.YES));
-                        doc.add(new StringField("day", new SimpleDateFormat("dd").format(date), Store.YES));
-                        doc.add(new StringField("ip", UNKNOWN_IP, Store.YES));
-                        doc.add(new StringField("pid", m.group(2), Store.YES));
-                        indexWriter.addDocument(cache.getFacetsConfig().build(taxoWriter, doc));
-                        records++;
+                    try {
+                        Matcher m = pdfDownloadPattern.matcher(line);
+                        if (m.matches()) {
+                            Date date = PDF_LOG_DATE_FORMAT.parse(m.group(1));
+                            Document doc = new Document();
+                            doc.add(new FacetField("action_facet", DataSource.AccessType.PDF_DOWNLOAD.toString()));
+                            doc.add(new StringField("action", DataSource.AccessType.PDF_DOWNLOAD.toString(), Store.YES));
+                            final String month = YEAR_MONTH.format(date);
+                            doc.add(new StringField("month", month, Store.YES));
+                            doc.add(new StringField("day", new SimpleDateFormat("dd").format(date), Store.YES));
+                            doc.add(new StringField("ip", UNKNOWN_IP, Store.YES));
+                            doc.add(new StringField("pid", m.group(2), Store.YES));
+                            indexWriter.addDocument(cache.getFacetsConfig().build(taxoWriter, doc));
+                            records++;
+                        }
+                    } catch (Throwable t) {
+                        logger.info("Skipping: " + line, t);
                     }
                 }
-                logger.debug("Index built from " + pdfLog.getName() + " with " + records + " records parsed from " + lines + " lines.");
+                indexWriter.commit();
+                taxoWriter.commit();
+                final int addedPdfRecordCount = cache.docCount(new TermQuery(new Term("action", DataSource.AccessType.PDF_DOWNLOAD.toString())));
+                if (addedPdfRecordCount != records) {
+                    throw new RuntimeException("Couldnt' find all the values! (" + addedPdfRecordCount + " != " + records + ")");
+                }
+                logger.info("Index built from " + pdfLog.getName() + " with " + records + " records parsed from " + lines + " lines. (" + cache.docCount() + " docs total)");
             } finally {
                 reader.close();
                 logger.info("Parsing " + pdfLog.getName() + " [completed]");
@@ -129,12 +144,15 @@ public class MicroServiceLogDataSource extends LuceneCachingDataSource {
                         records++;
                     }
                 }
-                logger.debug("Index built from " + rwLog.getName() + " with " + records + " records parsed from " + lines + " lines.");
+                taxoWriter.commit();
+                indexWriter.commit();
+
+                logger.info("Index built from " + rwLog.getName() + " with " + records + " records parsed from " + lines + " lines. (" + cache.docCount() + " docs total)");
             } finally {
                 reader.close();
-                logger.info("Parsing " + rwLog.getName() + " [started]");
+                logger.info("Parsing " + rwLog.getName() + " [completed]");
             }
-
+            System.out.println("Commit on close: " + indexWriter.getConfig().getCommitOnClose());
             indexWriter.close();
             taxoWriter.close();
         }

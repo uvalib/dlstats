@@ -35,7 +35,7 @@ public abstract class LuceneCachingDataSource implements DataSource {
     }
 
     @Override
-    public void getActionCountsPerMonth(String month, final Collection c, final HitMap actions, final boolean excludeKnownBots) {
+    public void getActionCountsPerMonth(final String month, final Collection c, final HitMap actions, final boolean excludeKnownBots) {
         try {
             /**
              * Keeps track of interactive views, which represents client region requests per day.
@@ -48,36 +48,40 @@ public abstract class LuceneCachingDataSource implements DataSource {
 
             searcher.search(new TermQuery(new Term("month", month)), new Collector() {
 
-                public LeafCollector getLeafCollector(LeafReaderContext context) throws IOException {
+                public LeafCollector getLeafCollector(final LeafReaderContext context) throws IOException {
                     return new LeafCollector() {
 
                         public void setScorer(Scorer scorer) throws IOException {
                         }
 
                         public void collect(int doc) throws IOException {
-                            Document d = indexReader.document(doc);
-                            String pid = d.get("pid");
-                            String client = d.get("ip");
-                            if (c.isIdInCollection(pid)) {
-                                String[] values = d.getValues("action");
-                                if (values != null) {
-                                    for (String v : values) {
-                                        if (v.equals(AccessType.REGION.toString())) {
-                                            int day = 1 << Integer.parseInt(d.get("day"));
-                                            Integer days = clientToDaysMap.get(client);
-                                            if (days == null) {
-                                                days = day;
+                            try {
+                                Document d = indexReader.document(context.docBase + doc);
+                                String pid = d.get("pid");
+                                String client = d.get("ip");
+                                if (c.isIdInCollection(pid)) {
+                                    String[] values = d.getValues("action");
+                                    if (values != null) {
+                                        for (String v : values) {
+                                            if (v.equals(AccessType.REGION.toString())) {
+                                                int day = 1 << Integer.parseInt(d.get("day"));
+                                                Integer days = clientToDaysMap.get(client);
+                                                if (days == null) {
+                                                    days = day;
+                                                } else {
+                                                    days |= day;
+                                                }
+                                                clientToDaysMap.put(client, days);
                                             } else {
-                                                days |= day;
-                                            }
-                                            clientToDaysMap.put(client, days);
-                                        } else {
-                                            if (!pid.equals(FEDORA_PROD_02) || (!excludeKnownBots || filter.include(client))) {
-                                                actions.hit(v);
+                                                if (!pid.equals(FEDORA_PROD_02) || (!excludeKnownBots || filter.include(client))) {
+                                                    actions.hit(v);
+                                                }
                                             }
                                         }
                                     }
                                 }
+                            } catch (RuntimeException ex) {
+                                ex.printStackTrace();
                             }
                         }
 
@@ -105,14 +109,14 @@ public abstract class LuceneCachingDataSource implements DataSource {
 
             searcher.search(new TermQuery(new Term("month", month)), new Collector() {
 
-                public LeafCollector getLeafCollector(LeafReaderContext context) throws IOException {
+                public LeafCollector getLeafCollector(final LeafReaderContext context) throws IOException {
                     return new LeafCollector() {
 
                         public void setScorer(Scorer scorer) throws IOException {
                         }
 
                         public void collect(int doc) throws IOException {
-                            Document d = indexReader.document(doc);
+                            Document d = indexReader.document(context.docBase + doc);
                             String pid = d.get("pid");
                             String client = d.get("ip");
                             if (c.isIdInCollection(pid)) {

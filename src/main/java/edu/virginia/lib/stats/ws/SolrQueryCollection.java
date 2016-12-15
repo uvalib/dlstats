@@ -55,14 +55,26 @@ public class SolrQueryCollection implements Collection {
 
     private String name;
 
+    private String query;
+    private SolrServer solr;
+    private TracksysClient tracksys;
+    private String fedoraUrl;
+
+
     public SolrQueryCollection(final String name, final String collection, final String query, final TracksysClient tracksys, final SolrServer solr, final String fedoraUrl) throws Exception {
         this.name = name;
         this.collection = collection;
+        this.query = query;
+        this.solr = solr;
+        this.tracksys = tracksys;
+        this.fedoraUrl = fedoraUrl;
         cache = new LuceneCache(this.getClass().getSimpleName());
-        updatePidCache(query, collection, solr, tracksys, fedoraUrl);
+        if (cache.isEmpty()) {
+            updatePidCache();
+        }
     }
 
-    private void updatePidCache(final String query, final String collection, final SolrServer solr, final TracksysClient tracksys, final String fedoraUrl) throws Exception {
+    private void updatePidCache() throws Exception {
         LOGGER.info("Updating cache of page pids [started]");
         FedoraClient fc = new FedoraClient(new FedoraCredentials(fedoraUrl, null, null));
 
@@ -230,6 +242,15 @@ public class SolrQueryCollection implements Collection {
             s.search(new BooleanQuery.Builder().add(new TermQuery(new Term("pid", id)), BooleanClause.Occur.MUST).add(new TermQuery(new Term("collection", collection)), BooleanClause.Occur.MUST).build(), c);
             return c.getTotalHits() == 1;
         } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void reloadCollection() {
+        try {
+            this.updatePidCache();
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
