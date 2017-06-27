@@ -85,8 +85,8 @@ public class Collections implements ContainerLifecycleListener {
                 new SolrQueryCollection("Health Sciences Library", "health_sciences", "+source_facet:\"UVA Library Digital Repository\" +library_facet:\"Health Sciences\" -shadowed_location_facet:\"HIDDEN\"", tracksys, solr, config.getProperty("fedora.url")),
                 new SolrQueryCollection("Special Collections", "special_collections", "+source_facet:\"UVA Library Digital Repository\" +library_facet:\"Special Collections\" -shadowed_location_facet:\"HIDDEN\"", tracksys, solr, config.getProperty("fedora.url"))};
         dataSources = new DataSource[]{
-                new FedoraProxyLogDataSource(new File("2016-11/fedoraproxy-all.log")),
-                new MicroServiceLogDataSource(new File("2016-11/iiif-http-all.log"), new File("2016-11/pdf-all.log"), new File("2016-11/rightswrapper2-all.log"))};
+                new FedoraProxyLogDataSource(new File("2017-06/fedoraproxy-all.log")),
+                new MicroServiceLogDataSource(new File("2017-06/iiif-http-all.log"), new File("2017-06/pdf-all.log"), new File("2017-06/rightswrapper2-all.log"))};
     }
 
     @GET

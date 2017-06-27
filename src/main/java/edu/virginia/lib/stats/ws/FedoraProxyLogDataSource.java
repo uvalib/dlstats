@@ -84,7 +84,7 @@ public class FedoraProxyLogDataSource extends LuceneCachingDataSource {
     }
 
     public String getEndingAvailability() {
-        return "2016-11";
+        return "2017-05";
     }
     
     public String toString() {
